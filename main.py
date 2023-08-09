@@ -10,9 +10,7 @@ import librosa
 import hashlib
 import types
 import shutil
-
 import torch
-
 import time
 import glob
 import cv2
@@ -24,6 +22,8 @@ from lib import vr as _inference
 from lib import automation
 from lib import spec_utils
 
+# Force reload of spec_utils to get updated code
+importlib.reload(spec_utils)  
 
 class hide_opt:
     def __enter__(self):
