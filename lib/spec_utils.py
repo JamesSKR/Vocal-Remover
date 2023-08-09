@@ -12,7 +12,12 @@ def loadWave(inp, mp, hep='none'):
     X_wave, X_spec_s = {},{}
     bands_n = len(mp.param['band'])-1
     X_wave[bands_n+1], _ = librosa.load(
-        inp, mp.param['band'][bands_n+1]['sr'], False, dtype=np.float32, res_type=mp.param['band'][bands_n+1]['res_type'])
+        inp,
+        sr=mp.param['band'][bands_n+1]['sr'], 
+        mono=False,
+        dtype=np.float32,
+        res_type=mp.param['band'][bands_n+1]['res_type']
+    )
     if X_wave[bands_n+1].ndim == 1:
         X_wave[bands_n+1] = np.asarray([X_wave[bands_n+1], X_wave[bands_n+1]])
     X_spec_s[bands_n+1] = wave_to_spectrogram(X_wave[bands_n+1], mp.param['band'][bands_n+1]['hl'], mp.param['band'][bands_n+1]['n_fft'], mp, True)
@@ -23,7 +28,7 @@ def loadWave(inp, mp, hep='none'):
         input_high_end_h = input_high_end = None
     for d in range(bands_n, 0, -1):
         bp = mp.param['band'][d]
-        X_wave[d] = librosa.resample(X_wave[d+1], mp.param['band'][d+1]['sr'], bp['sr'], res_type=bp['res_type'])
+        X_wave[d] = librosa.resample(X_wave[d+1], orig_sr=mp.param['band'][d+1]['sr'], target_sr=bp['sr'], res_type=bp['res_type'])
         X_spec_s[d] = wave_to_spectrogram(X_wave[d], bp['hl'], bp['n_fft'], mp, True) # threading true
     X_spec_m = combine_spectrograms(X_spec_s, mp)
     del X_wave, X_spec_s
@@ -106,12 +111,12 @@ def wave_to_spectrogram(wave, hop_length, n_fft, mp, multithreading):
 
         thread = threading.Thread(target=run_thread, kwargs={'y': wave_left, 'n_fft': n_fft, 'hop_length': hop_length})
         thread.start()
-        spec_right = librosa.stft(wave_right, n_fft, hop_length=hop_length)
+        spec_right = librosa.stft(wave_right, n_fft=n_fft, hop_length=hop_length)
         thread.join()
         spec = np.asfortranarray([spec_left_mt, spec_right])
     else:
-        spec_left = librosa.stft(wave_left, n_fft, hop_length=hop_length)
-        spec_right = librosa.stft(wave_right, n_fft, hop_length=hop_length)
+        spec_left = librosa.stft(wave_left, n_fft=n_fft, hop_length=hop_length)
+        spec_right = librosa.stft(wave_right, n_fft=n_fft, hop_length=hop_length)
         spec = np.asfortranarray([spec_left, spec_right])
 
     return spec
@@ -337,12 +342,12 @@ def cmb_spectrogram_to_wave(spec_m, mp, extra_bins_h=None, extra_bins=None):
             sr = mp.param['band'][d+1]['sr']
             if d == 1: # lower
                 spec_s = fft_lp_filter(spec_s, bp['lpf_start'], bp['lpf_stop'])
-                wave = librosa.resample(spectrogram_to_wave(spec_s, bp['hl'], mp, False), bp['sr'], sr, res_type="sinc_fastest")
+                wave = librosa.resample(spectrogram_to_wave(spec_s, bp['hl'], mp, False), orig_sr=bp['sr'], target_sr=sr, res_type="sinc_fastest")
             else: # mid
                 spec_s = fft_hp_filter(spec_s, bp['hpf_start'], bp['hpf_stop'] - 1)
                 spec_s = fft_lp_filter(spec_s, bp['lpf_start'], bp['lpf_stop'])
                 wave2 = np.add(wave, spectrogram_to_wave(spec_s, bp['hl'], mp, False))
-                wave = librosa.resample(wave2, bp['sr'], sr, res_type="sinc_fastest")
+                wave = librosa.resample(wave2, orig_sr=bp['sr'], target_sr=sr, res_type="sinc_fastest")
         
     return wave.T
 def cmb_spectrogram_to_wave_ffmpeg(spec_m, mp, tmp_basename, extra_bins_h=None, extra_bins=None):
